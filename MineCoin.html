@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MineCrush - Aventura de Peluches</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(to bottom, #6a11cb, #2575fc);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .score-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .score, .coins, .level {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .game-board {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 5px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .tile {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+            user-select: none;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tile:hover {
+            transform: scale(1.05);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .tile.selected {
+            background: rgba(255, 215, 0, 0.7);
+            transform: scale(1.1);
+            z-index: 2;
+        }
+
+        .tile.matched {
+            animation: matched 0.5s forwards;
+        }
+
+        @keyframes matched {
+            0% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.3) rotate(10deg);
+            }
+            100% {
+                transform: scale(0) rotate(20deg);
+                opacity: 0;
+            }
+        }
+
+        .tile.dropping {
+            animation: drop 0.4s ease-in forwards;
+        }
+
+        @keyframes drop {
+            0% {
+                transform: translateY(-50px);
+                opacity: 0.8;
+            }
+            70% {
+                transform: translateY(5px);
+            }
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .tile.new {
+            animation: appear 0.8s ease-out forwards;
+        }
+
+        @keyframes appear {
+            0% {
+                transform: translateY(-300%) scale(0.3);
+                opacity: 0;
+            }
+            60% {
+                transform: translateY(20px) scale(1.1);
+            }
+            100% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #6a11cb, #2575fc);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            transition: transform 0.5s;
+        }
+
+        .menu.hidden {
+            transform: translateY(-100%);
+        }
+
+        .menu h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .menu-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 30px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 80%;
+            max-width: 300px;
+            text-align: center;
+        }
+
+        .menu-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .wallet-info {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            max-width: 80%;
+            word-break: break-all;
+            text-align: center;
+        }
+
+        .power-ups {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .power-up {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .power-up:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .power-up-count {
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            background: #ffcc00;
+            color: #333;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            display: none;
+        }
+
+        .modal-content {
+            background: linear-gradient(to bottom, #6a11cb, #2575fc);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 80%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .modal p {
+            margin-bottom: 20px;
+            font-size: 1.2em;
+        }
+
+        .modal-button {
+            background: white;
+            color: #2575fc;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        .modal-button:hover {
+            background: #f0f0f0;
+            transform: scale(1.05);
+        }
+
+        .modal-button.secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .modal-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+        }
+
+        .shop-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .shop-item-icon {
+            font-size: 30px;
+        }
+
+        .shop-item-price {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: bold;
+        }
+
+        .footer {
+            padding: 10px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+            font-size: 0.9em;
+        }
+
+        .moves-counter {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .back-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .back-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .particle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 5;
+            animation: particle-fall 1s ease-in forwards;
+        }
+
+        @keyframes particle-fall {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100px) scale(0);
+                opacity: 0;
+            }
+        }
+
+        .leaderboard {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .leaderboard-table th {
+            background: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+
+        .leaderboard-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .leaderboard-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .prize-badge {
+            background: linear-gradient(to right, #FFD700, #FFA500);
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .usdt-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 4px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2300a86b"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>') no-repeat center;
+            background-size: contain;
+        }
+
+        .wallet-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff5252;
+        }
+
+        .status-indicator.connected {
+            background: #4caf50;
+        }
+
+        .metamask-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 0.9em;
+            text-align: left;
+        }
+
+        .metamask-info h3 {
+            margin-bottom: 10px;
+            color: #FFD700;
+        }
+
+        .metamask-info ul {
+            padding-left: 20px;
+        }
+
+        .metamask-info li {
+            margin-bottom: 5px;
+        }
+
+        .install-button {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #F6851B;
+            color: white;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .install-button:hover {
+            background: #E2761B;
+            transform: scale(1.05);
+        }
+
+        .network-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 5px;
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .network-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #8247E5;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <button class="back-button" onclick="showMenu()"><i class="fas fa-arrow-left"></i></button>
+            <div class="score-container">
+                <div class="score"><i class="fas fa-star"></i> <span id="score">0</span></div>
+                <div class="coins"><i class="fas fa-coins"></i> <span id="coins">100</span></div>
+                <div class="level"><i class="fas fa-layer-group"></i> <span id="level">1</span></div>
+                <div class="moves-counter"><i class="fas fa-hand-pointer"></i> <span id="moves">30</span></div>
+            </div>
+        </div>
+
+        <div class="game-board" id="game-board"></div>
+
+        <div class="power-ups">
+            <div class="power-up" onclick="usePowerUp('bomb')" title="Bomba: Elimina todos los peluches de un tipo">
+                <i class="fas fa-bomb"></i>
+                <span class="power-up-count" id="bomb-count">3</span>
+            </div>
+            <div class="power-up" onclick="usePowerUp('swap')" title="Intercambio: Intercambia dos peluches cualesquiera">
+                <i class="fas fa-exchange-alt"></i>
+                <span class="power-up-count" id="swap-count">3</span>
+            </div>
+            <div class="power-up" onclick="usePowerUp('rainbow')" title="Arcoíris: Elimina una fila y columna completa">
+                <i class="fas fa-rainbow"></i>
+                <span class="power-up-count" id="rainbow-count">1</span>
+            </div>
+            <div class="power-up" onclick="showShop()" title="Tienda: Compra más power-ups">
+                <i class="fas fa-shopping-cart"></i>
+            </div>
+        </div>
+
+        <div class="footer">
+            MineCrush - Aventura de Peluches
+        </div>
+    </div>
+
+    <div class="menu" id="menu">
+        <h1>MineCrush</h1>
+        <p>Aventura de Peluches</p>
+        <button class="menu-button" onclick="startGame()">
+            <i class="fas fa-play"></i> Jugar
+        </button>
+        <button class="menu-button" onclick="showLeaderboard()">
+            <i class="fas fa-trophy"></i> Leaderboard
+        </button>
+        <button class="menu-button" onclick="showShop()">
+            <i class="fas fa-shopping-cart"></i> Tienda de MineCoins
+        </button>
+        <button class="menu-button" onclick="connectWallet()">
+            <i class="fas fa-wallet"></i> Conectar Wallet
+        </button>
+        <button class="menu-button" onclick="showInstructions()">
+            <i class="fas fa-question-circle"></i> Cómo Jugar
+        </button>
+        
+        <div class="wallet-status" id="wallet-status">
+            <div class="status-indicator" id="status-indicator"></div>
+            <span id="wallet-text">Wallet no conectada</span>
+        </div>
+        
+        <div class="network-indicator" id="network-indicator" style="display: none;">
+            <div class="network-icon"></div>
+            <span id="network-text">Red: Polygon</span>
+        </div>
+        
+        <div class="wallet-info" id="wallet-address" style="display: none;"></div>
+    </div>
+
+    <div class="modal" id="modal">
+        <div class="modal-content" id="modal-content">
+            <!-- El contenido del modal se llenará dinámicamente -->
+        </div>
+    </div>
+
+    <script>
+        // Tipos de peluches (emojis)
+        const plushTypes = ['🧸', '🐰', '🐶', '🐱', '🐼', '🐯', '🦁', '🐨'];
+        
+        // Variables del juego
+        let board = [];
+        let score = 0;
+        let coins = 100;
+        let level = 1;
+        let moves = 30;
+        let selectedTile = null;
+        let gameActive = false;
+        let powerUps = {
+            bomb: 3,
+            swap: 3,
+            rainbow: 1
+        };
+        let activePowerUp = null;
+        let isAnimating = false;
+        
+        // Variables Web3
+        let provider;
+        let signer;
+        let walletAddress = null;
+        let isWalletConnected = false;
+        let currentChainId = null;
+        
+        // Configuración de la red Polygon
+        const POLYGON_CHAIN_ID = '0x89'; // 137 en hexadecimal
+        const POLYGON_NETWORK_PARAMS = {
+            chainId: POLYGON_CHAIN_ID,
+            chainName: 'Polygon Mainnet',
+            nativeCurrency: {
+                name: 'MATIC',
+                symbol: 'MATIC',
+                decimals: 18
+            },
+            rpcUrls: ['https://polygon-rpc.com/'],
+            blockExplorerUrls: ['https://polygonscan.com/']
+        };
+        
+        // Leaderboard de ejemplo
+        const leaderboardData = [
+            { rank: 1, name: "CryptoKing", score: 15420, prize: 50 },
+            { rank: 2, name: "NFTMaster", score: 13250, prize: 30 },
+            { rank: 3, name: "BlockchainPro", score: 12100, prize: 20 },
+            { rank: 4, name: "DeFiLord", score: 10950, prize: 10 },
+            { rank: 5, name: "TokenWhale", score: 9870, prize: 5 },
+            { rank: 6, name: "EtherHunter", score: 8650, prize: 0 },
+            { rank: 7, name: "SmartContract", score: 7430, prize: 0 },
+            { rank: 8, name: "GasGuru", score: 6210, prize: 0 },
+            { rank: 9, name: "YieldFarmer", score: 5420, prize: 0 },
+            { rank: 10, name: "LiquidityPool", score: 4870, prize: 0 }
+        ];
+
+        // Inicializar el juego
+        function initGame() {
+            createBoard();
+            updateUI();
+        }
+
+        // Crear el tablero de juego
+        function createBoard() {
+            const gameBoard = document.getElementById('game-board');
+            gameBoard.innerHTML = '';
+            board = [];
+            
+            for (let row = 0; row < 8; row++) {
+                board[row] = [];
+                for (let col = 0; col < 8; col++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.dataset.row = row;
+                    tile.dataset.col = col;
+                    
+                    // Asignar un tipo de peluche aleatorio
+                    const plushType = Math.floor(Math.random() * plushTypes.length);
+                    board[row][col] = plushType;
+                    tile.textContent = plushTypes[plushType];
+                    
+                    tile.addEventListener('click', () => handleTileClick(row, col));
+                    gameBoard.appendChild(tile);
+                }
+            }
+            
+            // Verificar si hay coincidencias iniciales y resolverlas
+            setTimeout(() => {
+                checkAndResolveMatches();
+            }, 500);
+        }
+
+        // Manejar clic en una ficha
+        function handleTileClick(row, col) {
+            if (!gameActive || isAnimating) return;
+            
+            const tile = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            
+            if (activePowerUp) {
+                useActivePowerUp(row, col);
+                return;
+            }
+            
+            if (!selectedTile) {
+                // Primera selección
+                selectedTile = { row, col };
+                tile.classList.add('selected');
+            } else {
+                // Segunda selección
+                const prevTile = document.querySelector(`[data-row="${selectedTile.row}"][data-col="${selectedTile.col}"]`);
+                prevTile.classList.remove('selected');
+                
+                // Verificar si las fichas son adyacentes
+                const rowDiff = Math.abs(row - selectedTile.row);
+                const colDiff = Math.abs(col - selectedTile.col);
+                
+                if ((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1)) {
+                    // Intercambiar fichas
+                    swapTiles(selectedTile.row, selectedTile.col, row, col);
+                    
+                    // Reducir movimientos
+                    moves--;
+                    updateUI();
+                    
+                    // Verificar si se acabaron los movimientos
+                    if (moves <= 0) {
+                        setTimeout(() => {
+                            endGame();
+                        }, 1000);
+                    }
+                }
+                
+                selectedTile = null;
+            }
+        }
+
+        // Intercambiar dos fichas
+        function swapTiles(row1, col1, row2, col2) {
+            isAnimating = true;
+            
+            // Intercambiar en el modelo de datos
+            const temp = board[row1][col1];
+            board[row1][col1] = board[row2][col2];
+            board[row2][col2] = temp;
+            
+            // Actualizar la vista con animación
+            updateBoard();
+            
+            // Verificar coincidencias
+            setTimeout(() => {
+                if (!checkAndResolveMatches()) {
+                    // Si no hay coincidencias, revertir el intercambio
+                    const temp = board[row1][col1];
+                    board[row1][col1] = board[row2][col1];
+                    board[row2][col1] = temp;
+                    
+                    // Actualizar la vista con animación
+                    updateBoard();
+                    isAnimating = false;
+                }
+            }, 300);
+        }
+
+        // Actualizar la vista del tablero
+        function updateBoard() {
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const tile = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                    if (board[row][col] === -1) {
+                        // Generar inmediatamente un nuevo peluche para evitar espacios vacíos
+                        board[row][col] = Math.floor(Math.random() * plushTypes.length);
+                        tile.textContent = plushTypes[board[row][col]];
+                        tile.classList.add('new');
+                        setTimeout(() => {
+                            tile.classList.remove('new');
+                        }, 800);
+                    } else {
+                        tile.textContent = plushTypes[board[row][col]];
+                    }
+                    tile.style.background = 'rgba(255, 255, 255, 0.8)';
+                }
+            }
+        }
+
+        // Verificar y resolver coincidencias
+        function checkAndResolveMatches() {
+            let hasMatches = false;
+            const matches = [];
+            
+            // Verificar coincidencias horizontales
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 6; col++) {
+                    if (board[row][col] !== -1 && board[row][col] === board[row][col + 1] && board[row][col] === board[row][col + 2]) {
+                        let matchLength = 3;
+                        while (col + matchLength < 8 && board[row][col] === board[row][col + matchLength]) {
+                            matchLength++;
+                        }
+                        
+                        for (let i = 0; i < matchLength; i++) {
+                            matches.push({ row, col: col + i });
+                        }
+                        
+                        hasMatches = true;
+                    }
+                }
+            }
+            
+            // Verificar coincidencias verticales
+            for (let col = 0; col < 8; col++) {
+                for (let row = 0; row < 6; row++) {
+                    if (board[row][col] !== -1 && board[row][col] === board[row + 1][col] && board[row][col] === board[row + 2][col]) {
+                        let matchLength = 3;
+                        while (row + matchLength < 8 && board[row][col] === board[row + matchLength][col]) {
+                            matchLength++;
+                        }
+                        
+                        for (let i = 0; i < matchLength; i++) {
+                            matches.push({ row: row + i, col });
+                        }
+                        
+                        hasMatches = true;
+                    }
+                }
+            }
+            
+            // Eliminar duplicados
+            const uniqueMatches = [];
+            matches.forEach(match => {
+                if (!uniqueMatches.some(m => m.row === match.row && m.col === match.col)) {
+                    uniqueMatches.push(match);
+                }
+            });
+            
+            if (hasMatches) {
+                isAnimating = true;
+                
+                // Animar las fichas coincidentes
+                uniqueMatches.forEach(match => {
+                    const tile = document.querySelector(`[data-row="${match.row}"][data-col="${match.col}"]`);
+                    tile.classList.add('matched');
+                    
+                    // Crear partículas
+                    createParticles(tile);
+                });
+                
+                // Calcular puntuación
+                const points = uniqueMatches.length * 10 * level;
+                score += points;
+                coins += Math.floor(uniqueMatches.length / 3);
+                
+                // Actualizar UI después de un corto retraso
+                setTimeout(() => {
+                    // Eliminar fichas coincidentes
+                    uniqueMatches.forEach(match => {
+                        board[match.row][match.col] = -1; // Marcar como vacío
+                    });
+                    
+                    // Hacer caer las fichas
+                    dropTiles();
+                    
+                    // Rellenar el tablero inmediatamente
+                    fillBoard();
+                    
+                    // Actualizar la vista
+                    updateBoard();
+                    updateUI();
+                    
+                    // Verificar si hay más coincidencias
+                    setTimeout(() => {
+                        isAnimating = false;
+                        checkAndResolveMatches();
+                    }, 800);
+                }, 500);
+            } else {
+                isAnimating = false;
+            }
+            
+            return hasMatches;
+        }
+
+        // Crear partículas de animación
+        function createParticles(tile) {
+            const rect = tile.getBoundingClientRect();
+            const gameBoard = document.getElementById('game-board');
+            const boardRect = gameBoard.getBoundingClientRect();
+            
+            for (let i = 0; i < 5; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = `${rect.left - boardRect.left + rect.width / 2 - 10}px`;
+                particle.style.top = `${rect.top - boardRect.top + rect.height / 2 - 10}px`;
+                particle.style.backgroundColor = `hsl(${Math.random() * 360}, 70%, 60%)`;
+                
+                gameBoard.appendChild(particle);
+                
+                setTimeout(() => {
+                    particle.remove();
+                }, 1000);
+            }
+        }
+
+        // Hacer caer las fichas con animación
+        function dropTiles() {
+            const fallingTiles = [];
+            
+            for (let col = 0; col < 8; col++) {
+                let emptyRow = 7;
+                
+                for (let row = 7; row >= 0; row--) {
+                    if (board[row][col] !== -1) {
+                        if (row !== emptyRow) {
+                            board[emptyRow][col] = board[row][col];
+                            board[row][col] = -1;
+                            
+                            // Registrar ficha que ha caído
+                            fallingTiles.push({fromRow: row, toRow: emptyRow, col});
+                        }
+                        emptyRow--;
+                    }
+                }
+            }
+            
+            // Animar todas las fichas que han caído
+            fallingTiles.forEach(({fromRow, toRow, col}) => {
+                const tile = document.querySelector(`[data-row="${toRow}"][data-col="${col}"]`);
+                tile.classList.add('dropping');
+                
+                // Calcular distancia de caída para ajustar la animación
+                const distance = (fromRow - toRow) * 50; // Aproximación de píxeles por fila
+                tile.style.setProperty('--distance', `-${distance}px`);
+                
+                setTimeout(() => {
+                    tile.classList.remove('dropping');
+                }, 400);
+            });
+        }
+
+        // Rellenar el tablero con nuevas fichas y animación
+        function fillBoard() {
+            // Buscar todos los espacios vacíos y generar nuevos peluches
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (board[row][col] === -1) {
+                        board[row][col] = Math.floor(Math.random() * plushTypes.length);
+                        
+                        // Animar las nuevas fichas
+                        const tile = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                        tile.classList.add('new');
+                        setTimeout(() => {
+                            tile.classList.remove('new');
+                        }, 800);
+                    }
+                }
+            }
+        }
+
+        // Usar power-up
+        function usePowerUp(type) {
+            if (powerUps[type] <= 0) {
+                showModal('Power-ups agotados', 'No te quedan más power-ups de este tipo. Visita la tienda para conseguir más.');
+                return;
+            }
+            
+            activePowerUp = type;
+            showModal('Power-up activado', `Haz clic en el tablero para usar el power-up ${getPowerUpName(type)}`);
+        }
+
+        // Usar power-up activo
+        function useActivePowerUp(row, col) {
+            if (!activePowerUp) return;
+            
+            powerUps[activePowerUp]--;
+            isAnimating = true;
+            
+            switch (activePowerUp) {
+                case 'bomb':
+                    // Eliminar todos los peluches del mismo tipo
+                    const targetType = board[row][col];
+                    for (let r = 0; r < 8; r++) {
+                        for (let c = 0; c < 8; c++) {
+                            if (board[r][c] === targetType) {
+                                board[r][c] = -1;
+                                score += 5 * level;
+                                
+                                // Animar la eliminación
+                                const tile = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                                tile.classList.add('matched');
+                                createParticles(tile);
+                            }
+                        }
+                    }
+                    
+                    setTimeout(() => {
+                        dropTiles();
+                        setTimeout(() => {
+                            fillBoard();
+                            updateBoard();
+                            updateUI();
+                            isAnimating = false;
+                            checkAndResolveMatches();
+                        }, 500);
+                    }, 500);
+                    break;
+                    
+                case 'swap':
+                    // Permitir intercambiar dos fichas cualesquiera
+                    if (!selectedTile) {
+                        selectedTile = { row, col };
+                        const tile = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                        tile.classList.add('selected');
+                        showModal('Power-up de intercambio', 'Ahora selecciona otra ficha para intercambiar');
+                        return;
+                    } else {
+                        const prevTile = document.querySelector(`[data-row="${selectedTile.row}"][data-col="${selectedTile.col}"]`);
+                        prevTile.classList.remove('selected');
+                        
+                        // Intercambiar fichas
+                        swapTiles(selectedTile.row, selectedTile.col, row, col);
+                        selectedTile = null;
+                    }
+                    break;
+                    
+                case 'rainbow':
+                    // Eliminar fila y columna completa
+                    for (let r = 0; r < 8; r++) {
+                        board[r][col] = -1;
+                        score += 10 * level;
+                        
+                        // Animar la eliminación
+                        const tile = document.querySelector(`[data-row="${r}"][data-col="${col}"]`);
+                        tile.classList.add('matched');
+                        createParticles(tile);
+                    }
+                    for (let c = 0; c < 8; c++) {
+                        if (c !== col) { // Evitar duplicar la ficha central
+                            board[row][c] = -1;
+                            score += 10 * level;
+                            
+                            // Animar la eliminación
+                            const tile = document.querySelector(`[data-row="${row}"][data-col="${c}"]`);
+                            tile.classList.add('matched');
+                            createParticles(tile);
+                        }
+                    }
+                    
+                    setTimeout(() => {
+                        dropTiles();
+                        setTimeout(() => {
+                            fillBoard();
+                            updateBoard();
+                            updateUI();
+                            isAnimating = false;
+                            checkAndResolveMatches();
+                        }, 500);
+                    }, 500);
+                    break;
+            }
+            
+            activePowerUp = null;
+        }
+
+        // Obtener nombre del power-up
+        function getPowerUpName(type) {
+            switch (type) {
+                case 'bomb': return 'Bomba';
+                case 'swap': return 'Intercambio';
+                case 'rainbow': return 'Arcoíris';
+                default: return '';
+            }
+        }
+
+        // Mostrar tienda
+        function showShop() {
+            let shopContent = `
+                <h2>Tienda de MineCoins</h2>
+                <p>Tienes: <i class="fas fa-coins"></i> ${coins} MineCoins</p>
+                
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <div class="shop-item-icon"><i class="fas fa-bomb"></i></div>
+                        <div>Bomba (x3)</div>
+                    </div>
+                    <div class="shop-item-price">
+                        <i class="fas fa-coins"></i> 50
+                    </div>
+                    <button class="modal-button" onclick="buyItem('bomb', 3, 50)">Comprar</button>
+                </div>
+                
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <div class="shop-item-icon"><i class="fas fa-exchange-alt"></i></div>
+                        <div>Intercambio (x3)</div>
+                    </div>
+                    <div class="shop-item-price">
+                        <i class="fas fa-coins"></i> 40
+                    </div>
+                    <button class="modal-button" onclick="buyItem('swap', 3, 40)">Comprar</button>
+                </div>
+                
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <div class="shop-item-icon"><i class="fas fa-rainbow"></i></div>
+                        <div>Arcoíris (x1)</div>
+                    </div>
+                    <div class="shop-item-price">
+                        <i class="fas fa-coins"></i> 100
+                    </div>
+                    <button class="modal-button" onclick="buyItem('rainbow', 1, 100)">Comprar</button>
+                </div>
+                
+                <div class="shop-item">
+                    <div class="shop-item-info">
+                        <div class="shop-item-icon"><i class="fas fa-hand-pointer"></i></div>
+                        <div>Movimientos extra (+10)</div>
+                    </div>
+                    <div class="shop-item-price">
+                        <i class="fas fa-coins"></i> 30
+                    </div>
+                    <button class="modal-button" onclick="buyMoves(10, 30)">Comprar</button>
+                </div>
+                
+                <button class="modal-button" onclick="closeModal()">Cerrar</button>
+            `;
+            
+            showModal('Tienda de MineCoins', shopContent);
+        }
+
+        // Comprar item
+        function buyItem(type, quantity, price) {
+            if (coins >= price) {
+                coins -= price;
+                powerUps[type] += quantity;
+                updateUI();
+                showShop(); // Actualizar la tienda
+            } else {
+                showModal('MineCoins insuficientes', 'No tienes suficientes MineCoins para comprar este item.');
+            }
+        }
+
+        // Comprar movimientos extra
+        function buyMoves(quantity, price) {
+            if (coins >= price) {
+                coins -= price;
+                moves += quantity;
+                updateUI();
+                showShop(); // Actualizar la tienda
+            } else {
+                showModal('MineCoins insuficientes', 'No tienes suficientes MineCoins para comprar movimientos extra.');
+            }
+        }
+
+        // Mostrar leaderboard
+        function showLeaderboard() {
+            let leaderboardHTML = `
+                <h2>Leaderboard - Premios en USDT</h2>
+                <p>Los mejores jugadores del mes reciben premios en USDT</p>
+                <div class="leaderboard">
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Jugador</th>
+                                <th>Puntuación</th>
+                                <th>Premio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            leaderboardData.forEach(player => {
+                const prizeHTML = player.prize > 0 
+                    ? `<span class="prize-badge"><span class="usdt-icon"></span>${player.prize} USDT</span>` 
+                    : '-';
+                    
+                leaderboardHTML += `
+                    <tr>
+                        <td>#${player.rank}</td>
+                        <td>${player.name}</td>
+                        <td>${player.score.toLocaleString()}</td>
+                        <td>${prizeHTML}</td>
+                    </tr>
+                `;
+            });
+            
+            leaderboardHTML += `
+                        </tbody>
+                    </table>
+                </div>
+                <p style="margin-top: 20px; font-size: 0.9em; opacity: 0.8;">
+                    Los premios se distribuyen el último día de cada mes a las wallets conectadas.
+                </p>
+                <button class="modal-button" onclick="closeModal()">Cerrar</button>
+            `;
+            
+            showModal('Leaderboard', leaderboardHTML);
+        }
+
+        // Cambiar a la red de Polygon
+        async function switchToPolygon() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: POLYGON_CHAIN_ID }],
+                });
+                return true;
+            } catch (switchError) {
+                // Esta error indica que la cadena no ha sido agregada a MetaMask
+                if (switchError.code === 4902) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [POLYGON_NETWORK_PARAMS],
+                        });
+                        return true;
+                    } catch (addError) {
+                        console.error('Error al agregar la red Polygon:', addError);
+                        return false;
+                    }
+                } else {
+                    console.error('Error al cambiar a la red Polygon:', switchError);
+                    return false;
+                }
+            }
+        }
+
+        // Conectar wallet
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    // Solicitar acceso a la cuenta
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    walletAddress = accounts[0];
+                    
+                    // Configurar proveedor y signer
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    
+                    // Obtener el chain ID actual
+                    const network = await provider.getNetwork();
+                    currentChainId = network.chainId;
+                    
+                    // Verificar si estamos en la red correcta
+                    if (currentChainId !== 137) { // 137 es el chain ID de Polygon Mainnet
+                        const switched = await switchToPolygon();
+                        if (!switched) {
+                            showModal('Error de Red', 'No se pudo cambiar a la red de Polygon. Por favor, hazlo manualmente en MetaMask.');
+                            return;
+                        }
+                        
+                        // Actualizar la información de la red después del cambio
+                        const updatedNetwork = await provider.getNetwork();
+                        currentChainId = updatedNetwork.chainId;
+                    }
+                    
+                    isWalletConnected = true;
+                    updateWalletStatus();
+                    
+                    showModal('Wallet Conectada', `Tu wallet ha sido conectada exitosamente a la red de Polygon. Ahora puedes participar en el leaderboard y recibir premios en USDT.`);
+                } catch (error) {
+                    console.error("Error al conectar la wallet:", error);
+                    showModal('Error de Conexión', 'No se pudo conectar tu wallet. Por favor, intenta de nuevo.');
+                }
+            } else {
+                showMetaMaskNotDetected();
+            }
+        }
+
+        // Mostrar mensaje de MetaMask no detectado
+        function showMetaMaskNotDetected() {
+            const content = `
+                <h2>MetaMask no detectado</h2>
+                <p>Para conectar tu wallet y participar en el leaderboard con premios en USDT, necesitas tener MetaMask instalado en tu navegador.</p>
+                
+                <div class="metamask-info">
+                    <h3>¿Qué es MetaMask?</h3>
+                    <p>MetaMask es una billetera digital que te permite:</p>
+                    <ul>
+                        <li>Almacenar de forma segura tus criptomonedas</li>
+                        <li>Interactuar con aplicaciones descentralizadas (dApps)</li>
+                        <li>Participar en juegos y ganar premios</li>
+                    </ul>
+                    
+                    <h3>¿Cómo instalar MetaMask?</h3>
+                    <ol>
+                        <li>Visita el sitio oficial de MetaMask</li>
+                        <li>Descarga la extensión para tu navegador</li>
+                        <li>Sigue las instrucciones de instalación</li>
+                        <li>Crea o importa una wallet</li>
+                        <li>Vuelve a nuestro juego y haz clic en "Conectar Wallet"</li>
+                    </ol>
+                    
+                    <a href="https://metamask.io/download/" target="_blank" class="install-button">
+                        <i class="fas fa-external-link-alt"></i> Descargar MetaMask
+                    </a>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="modal-button secondary" onclick="closeModal()">Cerrar</button>
+                    <button class="modal-button" onclick="connectWallet()">Conectar</button>
+                </div>
+            `;
+            
+            showModal('MetaMask no detectado', content);
+        }
+
+        // Actualizar estado de la wallet
+        function updateWalletStatus() {
+            const statusIndicator = document.getElementById('status-indicator');
+            const walletText = document.getElementById('wallet-text');
+            const walletAddressDiv = document.getElementById('wallet-address');
+            const networkIndicator = document.getElementById('network-indicator');
+            const networkText = document.getElementById('network-text');
+            
+            if (isWalletConnected && walletAddress) {
+                statusIndicator.classList.add('connected');
+                walletText.textContent = 'Wallet conectada';
+                networkIndicator.style.display = 'flex';
+                
+                // Mostrar dirección acortada
+                const shortAddress = `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`;
+                walletAddressDiv.textContent = shortAddress;
+                walletAddressDiv.style.display = 'block';
+                walletAddressDiv.title = walletAddress;
+                
+                // Mostrar información de la red
+                if (currentChainId === 137) {
+                    networkText.textContent = 'Red: Polygon';
+                } else {
+                    networkText.textContent = `Red: ${currentChainId}`;
+                }
+            } else {
+                statusIndicator.classList.remove('connected');
+                walletText.textContent = 'Wallet no conectada';
+                networkIndicator.style.display = 'none';
+                walletAddressDiv.style.display = 'none';
+            }
+        }
+
+        // Mostrar instrucciones
+        function showInstructions() {
+            const instructions = `
+                <h2>Cómo Jugar</h2>
+                <p>1. Intercambia dos peluches adyacentes para formar líneas de 3 o más peluches iguales.</p>
+                <p>2. Las líneas pueden ser horizontales o verticales.</p>
+                <p>3. Cada combinación te da puntos y MineCoins.</p>
+                <p>4. Usa tus MineCoins para comprar power-ups en la tienda.</p>
+                <p>5. Completa cada nivel antes de quedarte sin movimientos.</p>
+                <p>6. Conecta tu wallet para participar en el leaderboard y ganar premios en USDT.</p>
+                <p><strong>Power-ups:</strong></p>
+                <p><i class="fas fa-bomb"></i> Bomba: Elimina todos los peluches de un tipo.</p>
+                <p><i class="fas fa-exchange-alt"></i> Intercambio: Intercambia dos peluches cualesquiera.</p>
+                <p><i class="fas fa-rainbow"></i> Arcoíris: Elimina una fila y columna completa.</p>
+                <button class="modal-button" onclick="closeModal()">Entendido</button>
+            `;
+            
+            showModal('Instrucciones', instructions);
+        }
+
+        // Mostrar modal
+        function showModal(title, content) {
+            const modal = document.getElementById('modal');
+            const modalContent = document.getElementById('modal-content');
+            
+            modalContent.innerHTML = `
+                <h2>${title}</h2>
+                <div>${content}</div>
+            `;
+            
+            modal.style.display = 'flex';
+        }
+
+        // Cerrar modal
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        // Mostrar menú
+        function showMenu() {
+            document.getElementById('menu').classList.remove('hidden');
+            gameActive = false;
+        }
+
+        // Iniciar juego
+        function startGame() {
+            document.getElementById('menu').classList.add('hidden');
+            gameActive = true;
+            initGame();
+        }
+
+        // Finalizar juego
+        function endGame() {
+            gameActive = false;
+            
+            // Calcular recompensa de MineCoins según la puntuación
+            const earnedCoins = Math.floor(score / 100);
+            coins += earnedCoins;
+            
+            // Si la wallet está conectada, guardar la puntuación en el leaderboard
+            if (isWalletConnected) {
+                saveScoreToLeaderboard();
+            }
+            
+            const endContent = `
+                <h2>¡Juego Terminado!</h2>
+                <p>Puntuación: ${score}</p>
+                <p>MineCoins ganados: ${earnedCoins}</p>
+                <p>¿Quieres jugar de nuevo?</p>
+                <button class="modal-button" onclick="nextLevel()">Siguiente Nivel</button>
+                <button class="modal-button" onclick="showMenu()">Menú Principal</button>
+            `;
+            
+            showModal('Fin del Juego', endContent);
+        }
+
+        // Guardar puntuación en el leaderboard
+        function saveScoreToLeaderboard() {
+            // En una implementación real, esto se guardaría en un contrato inteligente
+            // Por ahora, solo mostramos un mensaje
+            console.log(`Guardando puntuación ${score} para la wallet ${walletAddress}`);
+        }
+
+        // Siguiente nivel
+        function nextLevel() {
+            level++;
+            moves = 30 + (level * 5); // Más movimientos para niveles más altos
+            score = 0;
+            closeModal();
+            startGame();
+        }
+
+        // Actualizar UI
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('coins').textContent = coins;
+            document.getElementById('level').textContent = level;
+            document.getElementById('moves').textContent = moves;
+            
+            document.getElementById('bomb-count').textContent = powerUps.bomb;
+            document.getElementById('swap-count').textContent = powerUps.swap;
+            document.getElementById('rainbow-count').textContent = powerUps.rainbow;
+        }
+
+        // Inicializar la aplicación
+        window.onload = function() {
+            updateUI();
+            
+            // Verificar si MetaMask está instalado
+            if (typeof window.ethereum !== 'undefined') {
+                // Escuchar cambios de cuenta
+                window.ethereum.on('accountsChanged', function (accounts) {
+                    if (accounts.length === 0) {
+                        // El usuario desconectó su wallet
+                        isWalletConnected = false;
+                        walletAddress = null;
+                        updateWalletStatus();
+                    } else {
+                        // El usuario cambió de cuenta
+                        walletAddress = accounts[0];
+                        updateWalletStatus();
+                    }
+                });
+                
+                // Escuchar cambios de red
+                window.ethereum.on('chainChanged', function (chainId) {
+                    currentChainId = parseInt(chainId, 16);
+                    updateWalletStatus();
+                    
+                    // Verificar si estamos en la red correcta
+                    if (isWalletConnected && currentChainId !== 137) {
+                        showModal('Red Incorrecta', 'Por favor, cambia a la red de Polygon para jugar.');
+                    }
+                });
+            }
+        };
+    </script>
+</body>
+</html>
